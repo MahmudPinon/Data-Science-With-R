@@ -1,0 +1,176 @@
+library(rvest)
+library(dplyr)
+link="https://www.coingecko.com/"
+page=read_html(link)
+Coin=page%>%html_nodes(".font-bold")%>%html_text()
+Coin <- Coin[-c(101,102)]
+
+Price=page%>%html_nodes(".tw-flex-1 .no-wrap")%>%html_text()
+last_1_hour=page%>%html_nodes(".change1h span")%>%html_text()
+last_24_hour=page%>%html_nodes(".change24h span")%>%html_text()
+last_7_days=page%>%html_nodes(".change7d span")%>%html_text()
+
+last_24hours_volume=page%>%html_nodes(".lit .no-wrap")%>%html_text()
+Mkt_Cap=page%>%html_nodes(".cap-price .no-wrap")%>%html_text()
+
+#Data Frame1
+Crypto1=data.frame(Coin,Price,last_1_hour,last_24_hour,last_7_days,last_24hours_volume,Mkt_Cap,stringsAsFactors = FALSE)
+write.csv(Crypto1, "Crypto1.csv", row.names = FALSE)
+
+#Crypto=data.frame(Coin,Price,stringsAsFactors = FALSE)
+
+missing <- Crypto1[!complete.cases(Crypto),]
+print(missing)
+
+Crypto1$Price <- sub("\\$", "", Crypto1$Price)
+Crypto1$Mkt_Cap <- sub("\\$", "", Crypto1$Mkt_Cap)
+Crypto1$last_24hours_volume <- sub("\\$", "", Crypto1$last_24hours_volume)
+
+Crypto1$Price <- gsub(",", "", Crypto1$Price)
+Crypto1$Mkt_Cap <- gsub(",", "", Crypto1$Mkt_Cap)
+Crypto1$last_24hours_volume <- gsub(",", "", Crypto1$last_24hours_volume)
+
+
+
+Crypto1$last_1_hour <- sub("%", "", Crypto1$last_1_hour)
+Crypto1$last_24_hour <- sub("%", "", Crypto1$last_24_hour)
+Crypto1$last_7_days <- sub("%", "", Crypto1$last_7_days)
+
+
+Crypto1$last_1_hour <- as.numeric(Crypto1$last_1_hour)
+Crypto1$last_24_hour <- as.numeric(Crypto1$last_24_hour)
+Crypto1$last_7_days <- as.numeric(Crypto1$last_7_days)
+
+Crypto1$Price <- as.numeric(Crypto1$Price)
+Crypto1$Mkt_Cap <- as.numeric(Crypto1$Mkt_Cap)
+Crypto1$last_24hours_volume <- as.numeric(Crypto1$last_24hours_volume)
+
+
+Crypto1$Performance_Progress <- 
+  Crypto1$last_1_hour + 
+  Crypto1$last_24_hour+Crypto1$last_7_days
+
+Crypto1$Performance_Progress <- as.numeric(Crypto1$Performance_Progress)
+
+Crypto1$Growth <- case_when(
+  Crypto1$Performance_Progress <0 ~ "Negative",
+  Crypto1$Performance_Progress ==0 ~ "No Change",
+  Crypto1$Performance_Progress >3 ~ "Large Growth",
+  Crypto1$Performance_Progress >0 ~ "Positive"
+)
+
+Crypto1$Coin <- factor(Crypto1$Coin, ordered = TRUE)
+Crypto1$Growth <- factor(Crypto1$Growth,
+                         labels= c("Large Growth", "Positive", "No Change", "Negative"),
+                         levels= c(1, 2, 3, 4))
+
+
+Meanprice<- mean(Crypto1$Price)
+Meanprice
+Meanlast_1h_market<- mean(Crypto1$last_1_hour)
+Meanlast_1h_market
+Meanlast_24_hour<- mean(Crypto1$last_24_hour)
+Meanlast_24_hour
+Meanlast_7_days<- mean(Crypto1$last_7_days)
+Meanlast_7_days
+
+
+
+medianone=sort(Crypto1$Mkt_Cap)
+medianoneres=median(medianone)
+medianoneres
+mediantwo=sort(Crypto1$last_24hours_volume)
+mediantwores=median(mediantwo)
+mediantwores
+
+mode <- function(x){
+  unique_values <- unique(x)
+  table <- tabulate(match(x, unique_values))
+  unique_values[table == max(table)]
+}
+
+marketvolume=max(Crypto1$last_24hours_volume) - min(Crypto1$last_24hours_volume)
+marketvolume
+marketcap=max(Crypto1$Mkt_Cap) - min(Crypto1$Mkt_Cap)
+marketcap
+price=max(Crypto1$Price) - min(Crypto1$Price)
+price
+ 
+View(Crypto1)
+
+
+
+quantile(Crypto1$last_1_hour, prob = c(0.0,0.25,0.50, 0.75 , 0.100))
+quantile(Crypto1$last_24_hour, prob = c(0.0,0.25,0.50, 0.75 , 0.100))
+quantile(Crypto1$last_7_days)
+
+
+IQR(Crypto1$Mkt_Cap)
+
+var(Crypto1$last_1_hour)
+var(Crypto1$last_24_hour)
+var(Crypto1$last_7_days)
+
+
+sd(Crypto1$last_1_hour)
+sd(Crypto1$last_24_hour)
+sd(Crypto1$last_7_days)
+
+
+
+x = rnorm(Crypto1$last_1_hour, mean = mean(Crypto1$last_1_hour), sd=
+               sd(Crypto1$last_1_hour))
+hist(x)
+
+y = rnorm(Crypto1$last_24_hour, mean = mean(Crypto1$last_24_hour), sd=
+            sd(Crypto1$last_24_hour))
+hist(y)
+
+
+z = rnorm(Crypto1$last_7_days, mean = mean(Crypto1$last_7_days), sd=
+            sd(Crypto1$last_7_days))
+hist(z)
+
+library(ggplot2)
+
+Crypto1$Market_Cap_Quartile <- cut(Crypto1$Mkt_Cap, quantile(Crypto1$Mkt_Cap, probs = c(0, 0.25, 0.5, 0.75, 1)), include.lowest = TRUE, labels = c("$1M-$1B", "$1B-$10B", "$10B-$100B", "$100B-$1T"))
+write.csv(Crypto1, "Crypto1.csv", row.names = FALSE)
+
+# Create a bar plot of growth by market cap quartile
+ggplot(Crypto1, aes(x=Growth, fill=Market_Cap_Quartile)) +
+  geom_bar(position = position_fill(reverse = TRUE)) +
+  labs(title = "Overall Week Growth Reports by Market Cap Quartile", x = "Performance", y = "Frequency") +
+  coord_flip()
+
+
+
+ggplot(Crypto1, aes(x=Mkt_Cap, y=last_24hours_volume)) +
+  geom_point() +
+  geom_text(aes(label=Coin), vjust=1.5, hjust=1.5, size=2.5) +
+  scale_x_log10() +
+  scale_y_log10() +
+  labs(title = "Relationship between Last 24-hour Volume and Market Cap",
+       x = "Market Cap (log scale)", y = "Last 24h Volume ($)")
+
+
+
+filtered_data <- Crypto1 %>%
+  filter(Growth == "Large Growth", Mkt_Cap > 10000000000)
+
+# Create scatter plot of market cap vs. growth for filtered data
+ggplot(filtered_data, aes(x = Coin, y = Mkt_Cap, fill = Coin)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_y_log10() +
+  labs(title = "Coins with Large Growth and High Market Cap", x = "Coin", y = "Market Cap ($)") +
+  scale_fill_manual(values = rainbow(length(unique(filtered_data$Coin)))) +
+  theme_bw()
+
+
+data123 <- read.csv("Crypto1.csv")
+
+
+
+
+
+
+colnames(Crypto1)
